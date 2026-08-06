@@ -1,9 +1,12 @@
-name: Save Docker Image
+name: Save Docker Image to Release
 on: workflow_dispatch
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Free Disk Space
         run: |
@@ -12,16 +15,22 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
           sudo docker image prune -a -f
-          df -h
 
       - name: Pull and Save Docker Image
         run: |
           docker pull ghcr.io/open-webui/open-webui:0.11.0
           docker save ghcr.io/open-webui/open-webui:0.11.0 | gzip > open-webui-0.11.0.tar.gz
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      # 自動清理同名的舊 Release，確保不佔用雲端空間
+      - name: Delete Old Release if Exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete open-webui-0.11.0 --yes --cleanup-tag || true
+
+      - name: Create Tag and Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: open-webui-tar-gz
-          path: open-webui-0.11.0.tar.gz
-          retention-days: 1   # 設定 1 天後自動刪除，免手動清理
+          tag_name: open-webui-0.11.0
+          name: Open WebUI 0.11.0 Image
+          files: open-webui-0.11.0.tar.gz
