@@ -24,3 +24,4 @@ jobs:
         with:
           name: open-webui-tar-gz
           path: open-webui-0.11.0.tar.gz
+          retention-days: 1   # 設定 1 天後自動刪除，免手動清理
