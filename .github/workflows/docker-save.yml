@@ -1,15 +1,26 @@
 name: Save Docker Image
 on: workflow_dispatch
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Pull and Save
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo docker image prune -a -f
+          df -h
+
+      - name: Pull and Save Docker Image
         run: |
           docker pull ghcr.io/open-webui/open-webui:0.11.0
-          docker save ghcr.io/open-webui/open-webui:0.11.0 -o open-webui.tar
+          docker save ghcr.io/open-webui/open-webui:0.11.0 | gzip > open-webui-0.11.0.tar.gz
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: open-webui-tar
-          path: open-webui.tar
+          name: open-webui-tar-gz
+          path: open-webui-0.11.0.tar.gz
