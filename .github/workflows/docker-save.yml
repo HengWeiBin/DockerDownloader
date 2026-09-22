@@ -7,10 +7,6 @@ on:
         required: true
         default: 'ghcr.io/open-webui/open-webui:0.11.0'
         type: string
-      release_tag:
-        description: 'Release tag 名稱 (留空則自動從 image 產生)'
-        required: false
-        type: string
 
 jobs:
   build:
@@ -27,46 +23,30 @@ jobs:
           sudo rm -rf /usr/local/share/boost
           sudo docker image prune -a -f
 
-      - name: Resolve Tag and Filename
-        id: meta
-        env:
-          IMAGE: ${{ inputs.image }}
-          INPUT_TAG: ${{ inputs.release_tag }}
-        run: |
-          SAFE_TAG=$(echo "$INPUT_TAG" | tr -d '[:space:]')
-          if [ -z "$SAFE_TAG" ]; then
-            SAFE_TAG=$(echo "$IMAGE" | sed -e 's|[^A-Za-z0-9._-]|-|g' -e 's|-\+|-|g' -e 's|^-||' -e 's|-$||')
-          fi
-          SAFE_TAG=$(echo "$SAFE_TAG" | cut -c1-100)
-          echo "tag=$SAFE_TAG" >> "$GITHUB_OUTPUT"
-          echo "file=${SAFE_TAG}.tar.gz" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag=$SAFE_TAG file=${SAFE_TAG}.tar.gz for image=$IMAGE"
-
       - name: Pull and Save Docker Image
         env:
           IMAGE: ${{ inputs.image }}
         run: |
           docker pull "$IMAGE"
-          FILENAME="${{ steps.meta.outputs.file }}"
-          docker save "$IMAGE" | gzip > "$FILENAME"
-          ls -lh "$FILENAME"
+          docker save "$IMAGE" | gzip > docker-image.tar.gz
+          ls -lh docker-image.tar.gz
 
-      # 自動清理同名的舊 Release，確保不佔用雲端空間
+      # 每次覆蓋同一個 latest Release，避免佔用雲端空間
       - name: Delete Old Release if Exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete "${{ steps.meta.outputs.tag }}" --yes --cleanup-tag || true
+          gh release delete latest --yes --cleanup-tag || true
 
       - name: Create Tag and Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.tag }} Image
+          tag_name: latest
+          name: Latest Docker Image
           body: |
             Docker image: `${{ inputs.image }}`
             下載後載入方式：
             ```
-            gunzip -c ${{ steps.meta.outputs.file }} | docker load
+            gunzip -c docker-image.tar.gz | docker load
             ```
-          files: ${{ steps.meta.outputs.file }}
+          files: docker-image.tar.gz
